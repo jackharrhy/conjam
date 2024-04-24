@@ -33,30 +33,25 @@ impl GameState {
     }
 }
 
+static CELL_SIZE: f32 = 0.9;
+
 fn setup(_state: &mut GameState, _c: &mut EngineContext) {
     let mut camera = main_camera_mut();
 
-    camera.center = vec2(GRID_SIZE / 2.0, GRID_SIZE / 2.0);
-    camera.zoom = GRID_SIZE + 1.0;
+    let center = GRID_SIZE / 2.0;
+    camera.center = vec2(center, center);
+    camera.zoom = GRID_SIZE;
 }
 
-static CELL_SIZE: f32 = 0.75;
-
 fn update(state: &mut GameState, _c: &mut EngineContext) {
+    // draw_rect(splat(GRID_SIZE / 2.0), splat(GRID_SIZE), ORANGE, 0);
+
     for (index, c) in state.grid.iter().enumerate() {
-        let y = ((index as f32) / GRID_SIZE).floor() + CELL_SIZE / 2.0;
-        let x = ((index as f32) % GRID_SIZE) + CELL_SIZE / 2.0;
+        let y = ((index as f32) / GRID_SIZE).floor() + CELL_SIZE / 1.5;
+        let x = ((index as f32) % GRID_SIZE) + CELL_SIZE / 1.5;
         let color = if *c == 1 { GREEN } else { RED };
 
         draw_rect(vec2(x, y), splat(CELL_SIZE), color, 0);
     }
-
-    /*
-    for y in 0..HEIGHT {
-        for x in 0..WIDTH {
-            draw_rect(vec2(x as f32, y as f32), splat(1.0), RED, 0);
-        }
-    }
-    */
 }
 
