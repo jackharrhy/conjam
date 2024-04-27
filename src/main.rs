@@ -6,6 +6,7 @@ static SCREEN_WIDTH: u32 = 512;
 static SCREEN_HEIGHT: u32 = 512;
 
 static CELL_SIZE: f32 = 1.0;
+static GRID_SIZE: i32 = 128;
 
 fn config(config: GameConfig) -> GameConfig {
     let reso = ResolutionConfig::Physical(SCREEN_WIDTH, SCREEN_HEIGHT);
@@ -18,8 +19,8 @@ fn config(config: GameConfig) -> GameConfig {
 
 #[derive(Clone, PartialEq, Debug)]
 enum Cell {
-    Dead,
-    Alive,
+    Air,
+    Sand,
 }
 
 #[derive(Clone)]
@@ -45,42 +46,28 @@ fn set(grid: &mut Grid, x: i32, y: i32, value: Cell) {
     grid.cells[index] = value;
 }
 
-fn get_alive_neighbor_count(grid: &Grid, x: i32, y: i32) -> u8 {
-    let mut count = 0;
-    for xd in -1..=1 {
-        for yd in -1..=1 {
-            if xd == 0 && yd == 0 {
-                continue;
-            }
-
-            if let Some(Cell::Alive) = get(grid, x + xd, y + yd) {
-                count += 1;
-            }
-        }
-    }
-
-    return count;
-}
-
 fn step(grid: &Grid) -> Grid {
-    let mut new_grid = grid.clone();
+    let mut new_grid = Grid::new(grid.size);
 
     for x in 0..grid.size {
         for y in 0..grid.size {
-            let count = get_alive_neighbor_count(grid, x, y);
+            let cell = get(grid, x, y).unwrap();
+            match cell {
+                Cell::Air => {}
+                Cell::Sand => {
+                    if y == 0 {
+                        set(&mut new_grid, x, y, Cell::Sand);
+                        continue;
+                    }
 
-            match get(grid, x, y) {
-                Some(&Cell::Alive) => {
-                    if count < 2 || count > 3 {
-                        set(&mut new_grid, x, y, Cell::Dead);
+                    let bellow = get(grid, x, y - 1);
+
+                    if bellow == Some(&Cell::Air) {
+                        set(&mut new_grid, x, y - 1, Cell::Sand);
+                    } else {
+                        set(&mut new_grid, x, y, Cell::Sand);
                     }
                 }
-                Some(&Cell::Dead) => {
-                    if count == 3 {
-                        set(&mut new_grid, x, y, Cell::Alive);
-                    }
-                }
-                None => panic!("there should never be a missing cell!"),
             }
         }
     }
@@ -90,7 +77,7 @@ fn step(grid: &Grid) -> Grid {
 
 impl Grid {
     fn new(size: i32) -> Self {
-        let cells = vec![Cell::Dead; (size * size) as usize];
+        let cells = vec![Cell::Air; (size * size) as usize];
         Self { cells, size }
     }
 }
@@ -99,19 +86,11 @@ pub struct GameState {
     grid: Grid,
 }
 
-fn setup_glider(grid: &mut Grid, x: i32, y: i32) {
-    set(grid, x + 0, y + 0, Cell::Alive);
-    set(grid, x + 1, y + 0, Cell::Alive);
-    set(grid, x + 2, y + 0, Cell::Alive);
-    set(grid, x + 2, y + 1, Cell::Alive);
-    set(grid, x + 1, y + 2, Cell::Alive);
-}
-
 impl GameState {
     pub fn new(_c: &EngineState) -> Self {
-        let mut grid = Grid::new(256);
+        let mut grid = Grid::new(GRID_SIZE);
 
-        let choices = [Cell::Dead, Cell::Alive];
+        let choices = [Cell::Air, Cell::Sand];
         let mut rng = rand::thread_rng();
 
         let cells: Vec<Cell> = (0..(grid.size * grid.size))
@@ -120,10 +99,6 @@ impl GameState {
             .collect();
 
         grid.cells = cells;
-
-        setup_glider(&mut grid, 1, 1);
-        setup_glider(&mut grid, 6, 1);
-        setup_glider(&mut grid, 11, 1);
 
         Self { grid }
     }
@@ -143,11 +118,11 @@ fn update(state: &mut GameState, _c: &mut EngineContext) {
     draw_rect(splat(size / 2.0), splat(size), BLACK, 0);
 
     for (index, c) in cells.iter().enumerate() {
-        if let &Cell::Alive = c {
+        if let &Cell::Sand = c {
             let y = ((index as f32) / size).floor() + CELL_SIZE / 2.0;
             let x = ((index as f32) % size) + CELL_SIZE / 2.0;
 
-            draw_rect(vec2(x, y), splat(CELL_SIZE), PINK, 0);
+            draw_rect(vec2(x, y), splat(CELL_SIZE), ORANGE_RED, 0);
         }
     }
 
@@ -162,9 +137,9 @@ mod tests {
 
         let mut grid = Grid::new(16);
 
-        set(&mut grid, 0, 0, Cell::Alive);
+        set(&mut grid, 0, 0, Cell::Sand);
         let val = get(&grid, 0, 0);
 
-        assert_eq!(val, Some(&Cell::Alive));
+        assert_eq!(val, Some(&Cell::Sand));
     }
 }
