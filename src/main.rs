@@ -109,7 +109,17 @@ fn setup_glider(grid: &mut Grid, x: i32, y: i32) {
 
 impl GameState {
     pub fn new(_c: &EngineState) -> Self {
-        let mut grid = Grid::new(16);
+        let mut grid = Grid::new(64);
+
+        let choices = [Cell::Dead, Cell::Alive(PINK)];
+        let mut rng = rand::thread_rng();
+
+        let cells: Vec<Cell> = (0..(grid.size * grid.size))
+            .map(|_| choices.choose(&mut rng).unwrap())
+            .cloned()
+            .collect();
+
+        grid.cells = cells;
 
         setup_glider(&mut grid, 1, 1);
         setup_glider(&mut grid, 6, 1);
@@ -141,9 +151,7 @@ fn update(state: &mut GameState, _c: &mut EngineContext) {
         }
     }
 
-    if cooldowns().can_use("step-simulation", 0.1) {
-        state.grid = step(&state.grid);
-    }
+    state.grid = step(&state.grid);
 }
 
 #[cfg(test)]
