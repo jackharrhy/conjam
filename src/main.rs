@@ -19,7 +19,7 @@ fn config(config: GameConfig) -> GameConfig {
 #[derive(Clone, PartialEq, Debug)]
 enum Cell {
     Dead,
-    Alive(Color),
+    Alive,
 }
 
 #[derive(Clone)]
@@ -53,7 +53,7 @@ fn get_alive_neighbor_count(grid: &Grid, x: i32, y: i32) -> u8 {
                 continue;
             }
 
-            if let Some(Cell::Alive(_c)) = get(grid, x + xd, y + yd) {
+            if let Some(Cell::Alive) = get(grid, x + xd, y + yd) {
                 count += 1;
             }
         }
@@ -70,14 +70,14 @@ fn step(grid: &Grid) -> Grid {
             let count = get_alive_neighbor_count(grid, x, y);
 
             match get(grid, x, y) {
-                Some(&Cell::Alive(_c)) => {
+                Some(&Cell::Alive) => {
                     if count < 2 || count > 3 {
                         set(&mut new_grid, x, y, Cell::Dead);
                     }
                 }
                 Some(&Cell::Dead) => {
                     if count == 3 {
-                        set(&mut new_grid, x, y, Cell::Alive(PINK));
+                        set(&mut new_grid, x, y, Cell::Alive);
                     }
                 }
                 None => panic!("there should never be a missing cell!"),
@@ -100,18 +100,18 @@ pub struct GameState {
 }
 
 fn setup_glider(grid: &mut Grid, x: i32, y: i32) {
-    set(grid, x + 0, y + 0, Cell::Alive(PINK));
-    set(grid, x + 1, y + 0, Cell::Alive(PINK));
-    set(grid, x + 2, y + 0, Cell::Alive(PINK));
-    set(grid, x + 2, y + 1, Cell::Alive(PINK));
-    set(grid, x + 1, y + 2, Cell::Alive(PINK));
+    set(grid, x + 0, y + 0, Cell::Alive);
+    set(grid, x + 1, y + 0, Cell::Alive);
+    set(grid, x + 2, y + 0, Cell::Alive);
+    set(grid, x + 2, y + 1, Cell::Alive);
+    set(grid, x + 1, y + 2, Cell::Alive);
 }
 
 impl GameState {
     pub fn new(_c: &EngineState) -> Self {
-        let mut grid = Grid::new(64);
+        let mut grid = Grid::new(256);
 
-        let choices = [Cell::Dead, Cell::Alive(PINK)];
+        let choices = [Cell::Dead, Cell::Alive];
         let mut rng = rand::thread_rng();
 
         let cells: Vec<Cell> = (0..(grid.size * grid.size))
@@ -143,11 +143,11 @@ fn update(state: &mut GameState, _c: &mut EngineContext) {
     draw_rect(splat(size / 2.0), splat(size), BLACK, 0);
 
     for (index, c) in cells.iter().enumerate() {
-        if let &Cell::Alive(color) = c {
+        if let &Cell::Alive = c {
             let y = ((index as f32) / size).floor() + CELL_SIZE / 2.0;
             let x = ((index as f32) % size) + CELL_SIZE / 2.0;
 
-            draw_rect(vec2(x, y), splat(CELL_SIZE), color, 0);
+            draw_rect(vec2(x, y), splat(CELL_SIZE), PINK, 0);
         }
     }
 
@@ -159,13 +159,12 @@ mod tests {
     #[test]
     fn sets_cells_correctly() {
         use crate::{get, set, Cell, Grid};
-        use comfy::PINK;
 
         let mut grid = Grid::new(16);
 
-        set(&mut grid, 0, 0, Cell::Alive(PINK));
+        set(&mut grid, 0, 0, Cell::Alive);
         let val = get(&grid, 0, 0);
 
-        assert_eq!(val, Some(&Cell::Alive(PINK)));
+        assert_eq!(val, Some(&Cell::Alive));
     }
 }
