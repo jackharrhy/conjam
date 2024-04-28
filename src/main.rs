@@ -6,7 +6,7 @@ static SCREEN_WIDTH: u32 = 512;
 static SCREEN_HEIGHT: u32 = 512;
 
 static CELL_SIZE: f32 = 1.0;
-static GRID_SIZE: i32 = 128;
+static GRID_SIZE: i32 = 256;
 
 fn config(config: GameConfig) -> GameConfig {
     let reso = ResolutionConfig::Physical(SCREEN_WIDTH, SCREEN_HEIGHT);
@@ -29,21 +29,34 @@ struct Grid {
     size: i32,
 }
 
-fn x_y_to_index(grid: &Grid, x: i32, y: i32) -> usize {
-    let x = x.rem_euclid(grid.size);
-    let y = y.rem_euclid(grid.size);
-
-    (y * grid.size + x) as usize
+fn x_y_to_index(grid: &Grid, x: i32, y: i32) -> Option<usize> {
+    if x < 0 || x >= grid.size || y < 0 || y >= grid.size {
+        None
+    } else {
+        Some((y * grid.size + x) as usize)
+    }
 }
 
 fn get(grid: &Grid, x: i32, y: i32) -> Option<&Cell> {
-    let index = x_y_to_index(grid, x, y);
-    grid.cells.get(index)
+    match x_y_to_index(grid, x, y) {
+        Some(index) => grid.cells.get(index),
+        None => None,
+    }
 }
 
 fn set(grid: &mut Grid, x: i32, y: i32, value: Cell) {
-    let index = x_y_to_index(grid, x, y);
-    grid.cells[index] = value;
+    match x_y_to_index(grid, x, y) {
+        Some(index) => grid.cells[index] = value,
+        None => {}
+    }
+}
+
+fn draw_point(grid: &mut Grid, x: i32, y: i32, size: i32) {
+    for dx in -size..=size {
+        for dy in -size..=size {
+            set(grid, x + dx, y + dy, Cell::Sand);
+        }
+    }
 }
 
 fn step(grid: &Grid) -> Grid {
@@ -75,6 +88,17 @@ fn step(grid: &Grid) -> Grid {
     new_grid
 }
 
+fn fill_grid_randomly(grid: &mut Grid, choices: [Cell; 2]) {
+    let mut rng = rand::thread_rng();
+
+    let cells: Vec<Cell> = (0..(grid.size * grid.size))
+        .map(|_| choices.choose(&mut rng).unwrap())
+        .cloned()
+        .collect();
+
+    grid.cells = cells;
+}
+
 impl Grid {
     fn new(size: i32) -> Self {
         let cells = vec![Cell::Air; (size * size) as usize];
@@ -91,14 +115,7 @@ impl GameState {
         let mut grid = Grid::new(GRID_SIZE);
 
         let choices = [Cell::Air, Cell::Sand];
-        let mut rng = rand::thread_rng();
-
-        let cells: Vec<Cell> = (0..(grid.size * grid.size))
-            .map(|_| choices.choose(&mut rng).unwrap())
-            .cloned()
-            .collect();
-
-        grid.cells = cells;
+        fill_grid_randomly(&mut grid, choices);
 
         Self { grid }
     }
@@ -124,6 +141,11 @@ fn update(state: &mut GameState, _c: &mut EngineContext) {
 
             draw_rect(vec2(x, y), splat(CELL_SIZE), ORANGE_RED, 0);
         }
+    }
+
+    if is_mouse_button_down(MouseButton::Left) {
+        let mouse = mouse_world().floor();
+        draw_point(&mut state.grid, mouse.x as i32, mouse.y as i32, 4);
     }
 
     state.grid = step(&state.grid);
