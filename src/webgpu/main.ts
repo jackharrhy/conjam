@@ -1,8 +1,22 @@
-const vertices = new Float32Array([
-  -0.8, -0.8, 0.8, -0.8, 0.8, 0.8,
+const CELL_SIZE = 1;
 
-  -0.8, -0.8, 0.8, 0.8, -0.8, 0.8,
+const vertices = new Float32Array([
+  -CELL_SIZE,
+  -CELL_SIZE,
+  CELL_SIZE,
+  -CELL_SIZE,
+  CELL_SIZE,
+  CELL_SIZE,
+
+  -CELL_SIZE,
+  -CELL_SIZE,
+  CELL_SIZE,
+  CELL_SIZE,
+  -CELL_SIZE,
+  CELL_SIZE,
 ]);
+
+const GRID_SIZE = 16;
 
 export const main = async (canvas: HTMLCanvasElement) => {
   if (!navigator.gpu) {
@@ -34,7 +48,7 @@ export const main = async (canvas: HTMLCanvasElement) => {
       {
         view: context.getCurrentTexture().createView(),
         loadOp: "clear",
-        clearValue: { r: 0.5, g: 0, b: 0.5, a: 1 },
+        clearValue: { r: 0.0, g: 0.0, b: 0.2, a: 1 },
         storeOp: "store",
       },
     ],
@@ -59,17 +73,46 @@ export const main = async (canvas: HTMLCanvasElement) => {
     ],
   };
 
+  const uniformArray = new Float32Array([GRID_SIZE, GRID_SIZE]);
+  const uniformBuffer = device.createBuffer({
+    label: "Grid Uniforms",
+    size: uniformArray.byteLength,
+    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+  });
+  device.queue.writeBuffer(uniformBuffer, 0, uniformArray);
+
   const cellShaderModule = device.createShaderModule({
     label: "Cell shader",
     code: `
+struct VertexInput {
+  @location(0) pos: vec2f,
+  @builtin(instance_index) instance: u32,
+};
+
+struct VertexOutput {
+  @builtin(position) pos: vec4f,
+  @location(0) cell: vec2f,
+};
+
+@group(0) @binding(0) var<uniform> grid: vec2f;
+
 @vertex
-fn vertexMain(@location(0) pos: vec2f) -> @builtin(position) vec4f {
-  return vec4f(pos, 0, 1);
+fn vertexMain(input: VertexInput) -> VertexOutput  {
+  let i = f32(input.instance);
+  let cell = vec2f(i % grid.x, floor(i / grid.x));
+  let cellOffset = cell / grid * 2;
+  let gridPos = (input.pos + 1) / grid - 1 + cellOffset;
+
+  var output: VertexOutput;
+  output.pos = vec4f(gridPos, 0, 1);
+  output.cell = cell;
+  return output;
 }
 
 @fragment
-fn fragmentMain() -> @location(0) vec4f {
-  return vec4f(1, 0, 0, 1);
+fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
+  let c = input.cell / grid;
+  return vec4f(c, 1-c.x, 1);
 }
     `,
   });
@@ -93,9 +136,23 @@ fn fragmentMain() -> @location(0) vec4f {
     },
   });
 
+  const bindGroup = device.createBindGroup({
+    label: "Cell renderer bind group",
+    layout: cellPipeline.getBindGroupLayout(0),
+    entries: [
+      {
+        binding: 0,
+        resource: { buffer: uniformBuffer },
+      },
+    ],
+  });
+
   pass.setPipeline(cellPipeline);
   pass.setVertexBuffer(0, vertexBuffer);
-  pass.draw(vertices.length / 2);
+
+  pass.setBindGroup(0, bindGroup);
+
+  pass.draw(vertices.length / 2, GRID_SIZE * GRID_SIZE);
 
   pass.end();
 
