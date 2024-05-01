@@ -1,10 +1,12 @@
 import { onMount } from "solid-js";
-import { main } from "./webgpu/main";
+import { initializeWebGPU, setupCanvas } from "./webgpu/main";
 
 export const App = () => {
   let canvas: HTMLCanvasElement;
   onMount(async () => {
-    main(canvas);
+    initializeWebGPU(() => {
+      setupCanvas(canvas);
+    });
   });
 
   // @ts-expect-error

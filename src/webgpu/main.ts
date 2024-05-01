@@ -1,39 +1,49 @@
-const CELL_SIZE = 1;
-
-const vertices = new Float32Array([
-  -CELL_SIZE,
-  -CELL_SIZE,
-  CELL_SIZE,
-  -CELL_SIZE,
-  CELL_SIZE,
-  CELL_SIZE,
-
-  -CELL_SIZE,
-  -CELL_SIZE,
-  CELL_SIZE,
-  CELL_SIZE,
-  -CELL_SIZE,
-  CELL_SIZE,
-]);
-
-const GRID_SIZE = 128;
-
-const UPDATE_INTERVAL = 50;
-let step = 0;
+import {
+  CELL_VERTS,
+  GRID_SIZE,
+  UPDATE_INTERVAL,
+  WORKGROUP_SIZE,
+} from "./consts";
+import { cellShader, simulationShader } from "./shaders";
 
 const cellStateArray = new Uint32Array(GRID_SIZE * GRID_SIZE);
 
-export const main = async (canvas: HTMLCanvasElement) => {
-  if (!navigator.gpu) {
-    throw new Error("WebGPU not supported on this browser.");
+let device: GPUDevice | null = null;
+
+export const initializeWebGPU = async (cb: () => void) => {
+  if (!("gpu" in navigator)) {
+    console.error("User agent doesn’t support WebGPU.");
+    return false;
   }
 
-  const adapter = await navigator.gpu.requestAdapter();
-  if (!adapter) {
-    throw new Error("No appropriate GPUAdapter found.");
+  const gpuAdapter = await navigator.gpu.requestAdapter();
+
+  if (!gpuAdapter) {
+    console.error("No WebGPU adapters found.");
+    return false;
   }
 
-  const device = await adapter.requestDevice();
+  device = await gpuAdapter.requestDevice();
+
+  device.lost.then((info) => {
+    console.error(`WebGPU device was lost: ${info.message}`);
+
+    device = null;
+
+    if (info.reason != "destroyed") {
+      initializeWebGPU(cb);
+    }
+  });
+
+  cb();
+
+  return true;
+};
+
+export const setupCanvas = async (canvas: HTMLCanvasElement) => {
+  if (device === null) {
+    throw new Error("GPUDevice not initialized");
+  }
 
   const context = canvas.getContext("webgpu")!;
 
@@ -45,11 +55,11 @@ export const main = async (canvas: HTMLCanvasElement) => {
 
   const vertexBuffer = device.createBuffer({
     label: "Cell vertices",
-    size: vertices.byteLength,
+    size: CELL_VERTS.byteLength,
     usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
   });
 
-  device.queue.writeBuffer(vertexBuffer, 0, vertices);
+  device.queue.writeBuffer(vertexBuffer, 0, CELL_VERTS);
 
   const cellStateStorage = [
     device.createBuffer({
@@ -68,7 +78,6 @@ export const main = async (canvas: HTMLCanvasElement) => {
     cellStateArray[i] = Math.random() > 0.6 ? 1 : 0;
   }
   device.queue.writeBuffer(cellStateStorage[0], 0, cellStateArray);
-
   device.queue.writeBuffer(cellStateStorage[1], 0, cellStateArray);
 
   const vertexBufferLayout: GPUVertexBufferLayout = {
@@ -92,91 +101,12 @@ export const main = async (canvas: HTMLCanvasElement) => {
 
   const cellShaderModule = device.createShaderModule({
     label: "Cell shader",
-    code: `
-struct VertexInput {
-  @location(0) pos: vec2f,
-  @builtin(instance_index) instance: u32,
-};
-
-struct VertexOutput {
-  @builtin(position) pos: vec4f,
-  @location(0) cell: vec2f,
-};
-
-@group(0) @binding(0) var<uniform> grid: vec2f;
-@group(0) @binding(1) var<storage> cellState: array<u32>;
-
-@vertex
-fn vertexMain(@location(0) pos: vec2f,
-              @builtin(instance_index) instance: u32) -> VertexOutput {
-  let i = f32(instance);
-  let cell = vec2f(i % grid.x, floor(i / grid.x));
-  let state = f32(cellState[instance]);
-
-  let cellOffset = cell / grid * 2;
-  let gridPos = (pos*state+1) / grid - 1 + cellOffset;
-
-  var output: VertexOutput;
-  output.pos = vec4f(gridPos, 0, 1);
-  output.cell = cell;
-  return output;
-}
-
-@fragment
-fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
-  let c = input.cell / grid;
-  return vec4f(c, 1-c.x, 1);
-}
-    `,
+    code: cellShader,
   });
 
-  const WORKGROUP_SIZE = 8;
-
   const simulationShaderModule = device.createShaderModule({
-    label: "Game of Life simulation shader",
-    code: `
-    @group(0) @binding(0) var<uniform> grid: vec2f;
-
-    @group(0) @binding(1) var<storage> cellStateIn: array<u32>;
-    @group(0) @binding(2) var<storage, read_write> cellStateOut: array<u32>;
-
-    fn cellIndex(cell: vec2u) -> u32 {
-      return (cell.y % u32(grid.y)) * u32(grid.x) +
-              (cell.x % u32(grid.x));
-    }
-
-    fn cellActive(x: u32, y: u32) -> u32 {
-      return cellStateIn[cellIndex(vec2(x, y))];
-    }
-
-    @compute @workgroup_size(${WORKGROUP_SIZE}, ${WORKGROUP_SIZE})
-    fn computeMain(@builtin(global_invocation_id) cell: vec3u) {
-      // Determine how many active neighbors this cell has.
-      let activeNeighbors = cellActive(cell.x+1, cell.y+1) +
-                            cellActive(cell.x+1, cell.y) +
-                            cellActive(cell.x+1, cell.y-1) +
-                            cellActive(cell.x, cell.y-1) +
-                            cellActive(cell.x-1, cell.y-1) +
-                            cellActive(cell.x-1, cell.y) +
-                            cellActive(cell.x-1, cell.y+1) +
-                            cellActive(cell.x, cell.y+1);
-
-      let i = cellIndex(cell.xy);
-
-      // Conway's game of life rules:
-      switch activeNeighbors {
-        case 2: {
-          cellStateOut[i] = cellStateIn[i];
-        }
-        case 3: {
-          cellStateOut[i] = 1;
-        }
-        default: {
-          cellStateOut[i] = 0;
-        }
-      }
-    }
-    `,
+    label: "Simulation shader",
+    code: simulationShader,
   });
 
   const bindGroupLayout = device.createBindGroupLayout({
@@ -276,7 +206,14 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
     },
   });
 
+  let intervalId: number;
+  let step = 0;
   function updateGrid() {
+    if (device === null) {
+      clearInterval(intervalId);
+      return;
+    }
+
     const encoder = device.createCommandEncoder();
     const computePass = encoder.beginComputePass();
 
@@ -302,13 +239,13 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
     });
 
     pass.setPipeline(cellPipeline);
-    pass.setBindGroup(0, bindGroups[step % 2]); // Updated!
+    pass.setBindGroup(0, bindGroups[step % 2]);
     pass.setVertexBuffer(0, vertexBuffer);
-    pass.draw(vertices.length / 2, GRID_SIZE * GRID_SIZE);
+    pass.draw(CELL_VERTS.length / 2, GRID_SIZE * GRID_SIZE);
 
     pass.end();
     device.queue.submit([encoder.finish()]);
   }
 
-  setInterval(updateGrid, UPDATE_INTERVAL);
+  intervalId = setInterval(updateGrid, UPDATE_INTERVAL);
 };
