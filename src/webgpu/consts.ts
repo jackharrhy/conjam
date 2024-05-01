@@ -19,4 +19,4 @@ export const GRID_SIZE = 128;
 
 export const WORKGROUP_SIZE = 8;
 
-export const UPDATE_INTERVAL = 50;
+export const UPDATE_INTERVAL = 20;

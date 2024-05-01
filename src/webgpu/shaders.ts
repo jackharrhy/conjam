@@ -55,5 +55,32 @@ fn cellValue(x: u32, y: u32) -> u32 {
 fn computeMain(@builtin(global_invocation_id) cell: vec3u) {
     let i = cellIndex(cell.xy);
     let value = cellStateIn[i];
+
+    if value == 1 {
+      if cell.y == 0 {
+        cellStateOut[i] = 1;
+      } else {
+        let bottomIndex = cellIndex(vec2(cell.x, cell.y - 1));
+        let bottomValue = cellStateIn[bottomIndex];
+
+        if bottomValue == 0 {
+          cellStateOut[i] = 0;
+        } else {
+          cellStateOut[i] = 1;
+        }
+      }
+    } else {
+      if f32(cell.y + 1) == grid.y {
+        cellStateOut[i] = 0;
+      } else {
+        let topIndex = cellIndex(vec2(cell.x, cell.y + 1));
+        let topValue = cellStateIn[topIndex];
+        if topValue == 1 {
+          cellStateOut[i] = 1;
+        } else {
+          cellStateOut[i] = 0;
+        }
+      }
+    }
 }
 `;
