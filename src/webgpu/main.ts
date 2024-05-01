@@ -111,7 +111,7 @@ fn vertexMain(@location(0) pos: vec2f,
               @builtin(instance_index) instance: u32) -> VertexOutput {
   let i = f32(instance);
   let cell = vec2f(i % grid.x, floor(i / grid.x));
-  let state = f32(cellState[instance]); // New line!
+  let state = f32(cellState[instance]);
 
   let cellOffset = cell / grid * 2;
   let gridPos = (pos*state+1) / grid - 1 + cellOffset;
