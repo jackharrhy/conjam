@@ -32,8 +32,7 @@ fn vertexMain(@location(0) pos: vec2f,
 
 @fragment
 fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
-  let c = input.cell / grid;
-  return vec4f(c, 1-c.x, 1);
+  return vec4f(0.93, 0.62, 0.38, 0);
 }
 `;
 
@@ -48,33 +47,13 @@ fn cellIndex(cell: vec2u) -> u32 {
             (cell.x % u32(grid.x));
 }
 
-fn cellActive(x: u32, y: u32) -> u32 {
+fn cellValue(x: u32, y: u32) -> u32 {
     return cellStateIn[cellIndex(vec2(x, y))];
 }
 
 @compute @workgroup_size(${WORKGROUP_SIZE}, ${WORKGROUP_SIZE})
 fn computeMain(@builtin(global_invocation_id) cell: vec3u) {
-    let activeNeighbors = cellActive(cell.x+1, cell.y+1) +
-                        cellActive(cell.x+1, cell.y) +
-                        cellActive(cell.x+1, cell.y-1) +
-                        cellActive(cell.x, cell.y-1) +
-                        cellActive(cell.x-1, cell.y-1) +
-                        cellActive(cell.x-1, cell.y) +
-                        cellActive(cell.x-1, cell.y+1) +
-                        cellActive(cell.x, cell.y+1);
-
     let i = cellIndex(cell.xy);
-
-    switch activeNeighbors {
-        case 2: {
-            cellStateOut[i] = cellStateIn[i];
-        }
-        case 3: {
-            cellStateOut[i] = 1;
-        }
-        default: {
-            cellStateOut[i] = 0;
-        }
-    }
+    let value = cellStateIn[i];
 }
 `;
