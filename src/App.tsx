@@ -10,5 +10,5 @@ export const App = () => {
   });
 
   // @ts-expect-error
-  return <canvas ref={canvas} width="512" height="512" />;
+  return <canvas ref={canvas} />;
 };

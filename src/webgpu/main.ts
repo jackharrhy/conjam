@@ -45,6 +45,9 @@ export const setupCanvas = async (canvas: HTMLCanvasElement) => {
     throw new Error("GPUDevice not initialized");
   }
 
+  canvas.width = GRID_SIZE;
+  canvas.height = GRID_SIZE;
+
   const context = canvas.getContext("webgpu")!;
 
   const canvasFormat = navigator.gpu.getPreferredCanvasFormat();
@@ -91,13 +94,13 @@ export const setupCanvas = async (canvas: HTMLCanvasElement) => {
     ],
   };
 
-  const uniformArray = new Float32Array([GRID_SIZE, GRID_SIZE]);
-  const uniformBuffer = device.createBuffer({
+  const gridSizeUniformArray = new Float32Array([GRID_SIZE, GRID_SIZE]);
+  const gridSizeUniformBuffer = device.createBuffer({
     label: "Grid Uniforms",
-    size: uniformArray.byteLength,
+    size: gridSizeUniformArray.byteLength,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
   });
-  device.queue.writeBuffer(uniformBuffer, 0, uniformArray);
+  device.queue.writeBuffer(gridSizeUniformBuffer, 0, gridSizeUniformArray);
 
   const cellShaderModule = device.createShaderModule({
     label: "Cell shader",
@@ -140,7 +143,7 @@ export const setupCanvas = async (canvas: HTMLCanvasElement) => {
       entries: [
         {
           binding: 0,
-          resource: { buffer: uniformBuffer },
+          resource: { buffer: gridSizeUniformBuffer },
         },
         {
           binding: 1,
@@ -159,7 +162,7 @@ export const setupCanvas = async (canvas: HTMLCanvasElement) => {
       entries: [
         {
           binding: 0,
-          resource: { buffer: uniformBuffer },
+          resource: { buffer: gridSizeUniformBuffer },
         },
         {
           binding: 1,
@@ -232,7 +235,7 @@ export const setupCanvas = async (canvas: HTMLCanvasElement) => {
         {
           view: context.getCurrentTexture().createView(),
           loadOp: "clear",
-          clearValue: { r: 0, g: 0, b: 0, a: 1.0 },
+          clearValue: { r: 1, g: 1, b: 1, a: 1.0 },
           storeOp: "store",
         },
       ],
