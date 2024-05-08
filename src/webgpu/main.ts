@@ -78,8 +78,20 @@ export const setupCanvas = async (canvas: HTMLCanvasElement) => {
   ];
 
   for (let i = 0; i < cellStateArray.length; ++i) {
-    cellStateArray[i] = Math.random() > 0.6 ? 1 : 0;
+    // cellStateArray[i] = Math.random() > 0.6 ? 1 : 0;
   }
+
+  cellStateArray[GRID_SIZE * 0 + 3] = 1;
+  cellStateArray[GRID_SIZE * 0 + 4] = 1;
+  cellStateArray[GRID_SIZE * 0 + 5] = 1;
+
+  cellStateArray[GRID_SIZE * 1 + 4] = 1;
+  cellStateArray[GRID_SIZE * 2 + 4] = 1;
+  cellStateArray[GRID_SIZE * 3 + 4] = 1;
+  cellStateArray[GRID_SIZE * 4 + 4] = 1;
+  cellStateArray[GRID_SIZE * 5 + 4] = 1;
+  cellStateArray[GRID_SIZE * 6 + 4] = 1;
+
   device.queue.writeBuffer(cellStateStorage[0], 0, cellStateArray);
   device.queue.writeBuffer(cellStateStorage[1], 0, cellStateArray);
 
@@ -205,9 +217,11 @@ export const setupCanvas = async (canvas: HTMLCanvasElement) => {
     layout: pipelineLayout,
     compute: {
       module: simulationShaderModule,
-      entryPoint: "computeMain",
+      entryPoint: "simulation",
     },
   });
+
+  const workgroupCount = Math.ceil(GRID_SIZE / WORKGROUP_SIZE);
 
   let intervalId: number;
   let step = 0;
@@ -220,10 +234,11 @@ export const setupCanvas = async (canvas: HTMLCanvasElement) => {
     const encoder = device.createCommandEncoder();
     const computePass = encoder.beginComputePass();
 
-    computePass.setPipeline(simulationPipeline);
-    computePass.setBindGroup(0, bindGroups[step % 2]);
+    const currentBindGroup = bindGroups[step % 2];
 
-    const workgroupCount = Math.ceil(GRID_SIZE / WORKGROUP_SIZE);
+    computePass.setPipeline(simulationPipeline);
+    computePass.setBindGroup(0, currentBindGroup);
+
     computePass.dispatchWorkgroups(workgroupCount, workgroupCount);
 
     computePass.end();
@@ -242,13 +257,16 @@ export const setupCanvas = async (canvas: HTMLCanvasElement) => {
     });
 
     pass.setPipeline(cellPipeline);
-    pass.setBindGroup(0, bindGroups[step % 2]);
+
+    pass.setBindGroup(0, currentBindGroup);
     pass.setVertexBuffer(0, vertexBuffer);
     pass.draw(CELL_VERTS.length / 2, GRID_SIZE * GRID_SIZE);
 
     pass.end();
+
     device.queue.submit([encoder.finish()]);
   }
 
   intervalId = setInterval(updateGrid, UPDATE_INTERVAL);
+  updateGrid();
 };
