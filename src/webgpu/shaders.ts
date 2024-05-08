@@ -138,8 +138,15 @@ fn simulation(@builtin(global_invocation_id) cell: vec3u) {
     let leftSand = cellValue(cell.x - 1, cell.y) == 1;
     let topLeftSand = cellValue(cell.x - 1, cell.y + 1) == 1;
     let topLeftTopAir = cellValue(cell.x - 1, cell.y + 2) == 0;
+    let canAcceptRightDiag = leftSand && topLeftSand && topLeftTopAir;
 
-    if leftSand && topLeftSand && topLeftTopAir {
+    // so the sand COULD fall here, but lets check if it wants to fall left
+    // consider the sand that's falling into us 'target'
+    let targetLeftAir = cellValue(cell.x - 2, cell.y + 1) == 0;
+    let targetBottomLeftAir = cellValue(cell.x - 2, cell.y) == 0;
+    let targetWantsToGoLeft = targetLeftAir && targetBottomLeftAir;
+
+    if canAcceptRightDiag && !targetWantsToGoLeft {
       setSand(i);
       return;
     }

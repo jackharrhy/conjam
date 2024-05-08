@@ -78,7 +78,7 @@ export const setupCanvas = async (canvas: HTMLCanvasElement) => {
   ];
 
   for (let i = 0; i < cellStateArray.length; ++i) {
-    // cellStateArray[i] = Math.random() > 0.6 ? 1 : 0;
+    cellStateArray[i] = Math.random() > 0.6 ? 1 : 0;
   }
 
   cellStateArray[GRID_SIZE * 0 + 3] = 1;
